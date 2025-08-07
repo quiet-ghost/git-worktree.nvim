@@ -29,13 +29,25 @@ end
 
 -- Execute shell command and return output
 local function execute_command(cmd)
-  local handle = io.popen(cmd)
+  local handle = io.popen(cmd .. " 2>&1")
   if not handle then
     return nil, "Failed to execute command"
   end
   local result = handle:read("*a")
-  local success = handle:close()
-  return result, success and nil or "Command failed"
+  local exit_code = handle:close()
+  
+  -- Handle exit codes properly - io.popen returns true/false, not exit codes
+  if not exit_code then
+    return result, "Command failed"
+  end
+  
+  return result, nil
+end
+
+-- Execute shell command with proper shell environment for git aliases
+local function execute_shell_command(cmd)
+  local shell_cmd = string.format("bash -c '%s'", cmd:gsub("'", "'\"'\"'"))
+  return execute_command(shell_cmd)
 end
 
 -- Create a new worktree
@@ -59,16 +71,23 @@ function M.create(branch_name)
     return
   end
 
-  -- Use the git wt alias we created
-  local cmd = string.format("cd %s && echo 'y' | git wt %s", git_root, branch_name)
-  local result, err = execute_command(cmd)
+  -- Create worktree using git worktree add
+  local worktree_path = git_root .. "/" .. M.config.worktree_dir .. "/" .. branch_name
+  local cmd = string.format("cd %s && git worktree add %s %s", git_root, worktree_path, branch_name)
+  local result, err = execute_shell_command(cmd)
   
   if err then
     vim.notify("Failed to create worktree: " .. (result or "Unknown error"), vim.log.levels.ERROR)
     return
   end
 
-  vim.notify("Worktree created: " .. branch_name, vim.log.levels.INFO)
+  -- Check if worktree was actually created
+  local worktree_path = git_root .. "/" .. M.config.worktree_dir .. "/" .. branch_name
+  if vim.fn.isdirectory(worktree_path) == 1 then
+    vim.notify("Worktree created: " .. branch_name, vim.log.levels.INFO)
+  else
+    vim.notify("Worktree creation may have failed: " .. branch_name, vim.log.levels.WARN)
+  end
   
   -- Auto-switch if enabled
   if M.config.auto_switch then
@@ -95,9 +114,10 @@ function M.remove(branch_name)
     return
   end
 
-  -- Use the git wtr alias we created
-  local cmd = string.format("cd %s && git wtr %s", git_root, branch_name)
-  local result, err = execute_command(cmd)
+  -- Remove worktree using git worktree remove
+  local worktree_path = git_root .. "/" .. M.config.worktree_dir .. "/" .. branch_name
+  local cmd = string.format("cd %s && git worktree remove %s", git_root, worktree_path)
+  local result, err = execute_shell_command(cmd)
   
   if err then
     vim.notify("Failed to remove worktree: " .. (result or "Unknown error"), vim.log.levels.ERROR)
@@ -154,6 +174,7 @@ function M.get_worktrees()
   local current_wt = {}
   
   for line in result:gmatch("[^\r\n]+") do
+    line = vim.trim(line)
     if line:match("^worktree ") then
       if current_wt.path then
         table.insert(worktrees, current_wt)
@@ -170,11 +191,17 @@ function M.get_worktrees()
     table.insert(worktrees, current_wt)
   end
 
-  -- Filter for .worktrees directory
+  -- Filter for .worktrees directory - fix the pattern matching
   local filtered = {}
+  local worktree_pattern = "/" .. M.config.worktree_dir .. "/"
+  
   for _, wt in ipairs(worktrees) do
-    if wt.path:match("/" .. M.config.worktree_dir .. "/") then
-      wt.branch = wt.branch or vim.fn.fnamemodify(wt.path, ":t")
+    -- Check if path contains the worktree directory
+    if wt.path and (wt.path:find(worktree_pattern, 1, true) or wt.path:find(M.config.worktree_dir .. "/", 1, true)) then
+      -- Extract branch name from path if not available
+      if not wt.branch then
+        wt.branch = vim.fn.fnamemodify(wt.path, ":t")
+      end
       table.insert(filtered, wt)
     end
   end
@@ -238,5 +265,9 @@ function M.switch_to(branch_name)
   vim.cmd("cd " .. worktree_path)
   vim.notify("Switched to worktree: " .. branch_name, vim.log.levels.INFO)
 end
+
+-- Export helper functions for telescope integration
+M.execute_command = execute_command
+M.execute_shell_command = execute_shell_command
 
 return M

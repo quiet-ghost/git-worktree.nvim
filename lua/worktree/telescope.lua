@@ -72,14 +72,12 @@ function M.create_worktree(opts)
   
   -- Get available branches
   local cmd = "git branch -a --format='%(refname:short)' | grep -v HEAD | sort -u"
-  local handle = io.popen(cmd)
-  if not handle then
-    vim.notify("Failed to get branches", vim.log.levels.ERROR)
+  local result, err = worktree.execute_command(cmd)
+  
+  if err or not result then
+    vim.notify("Failed to get branches: " .. (err or "Unknown error"), vim.log.levels.ERROR)
     return
   end
-  
-  local result = handle:read("*a")
-  handle:close()
   
   local branches = {}
   for branch in result:gmatch("[^\r\n]+") do
