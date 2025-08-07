@@ -89,7 +89,8 @@ The main interface is through Telescope:
 ### Lua API
 
 ```lua
--- Telescope pickers
+-- Telescope pickers (after loading extension)
+require("telescope").load_extension("worktree")
 require("telescope").extensions.worktree.worktrees()
 require("telescope").extensions.worktree.create_worktree()
 

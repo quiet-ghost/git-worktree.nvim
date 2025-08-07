@@ -1,6 +1,6 @@
 local has_telescope, telescope = pcall(require, "telescope")
 if not has_telescope then
-  return
+  error("This plugin requires nvim-telescope/telescope.nvim")
 end
 
 local pickers = require("telescope.pickers")
@@ -21,7 +21,7 @@ function M.worktrees(opts)
   local worktrees = worktree.get_worktrees()
   
   if #worktrees == 0 then
-    vim.notify("No worktrees found", vim.log.levels.WARN)
+    vim.notify("No worktrees found in .worktrees directory", vim.log.levels.WARN)
     return
   end
 
@@ -185,7 +185,7 @@ function M.create_worktree(opts)
   }):find()
 end
 
--- Register telescope extensions
+-- Register telescope extension
 return telescope.register_extension({
   setup = function(ext_config, config)
     -- Extension setup
@@ -195,9 +195,3 @@ return telescope.register_extension({
     create_worktree = M.create_worktree,
   },
 })
-
--- Also export the functions directly for manual use
-M.worktrees = M.worktrees
-M.create_worktree = M.create_worktree
-
-return M
