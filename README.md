@@ -4,12 +4,12 @@ A Neovim plugin for managing git worktrees with a clean `.worktrees/` directory 
 
 ## Features
 
-- 🌳 Create and manage git worktrees in a dedicated `.worktrees/` directory
-- 🔄 Interactive branch creation and switching
-- 🗑️ Easy worktree removal with confirmation
-- 🔭 Telescope integration for fuzzy finding
-- ⚡ Uses your existing `git wt` and `git wtr` aliases
-- 🎯 Auto-switch to newly created worktrees
+- Create and manage git worktrees in a dedicated `.worktrees/` directory
+- Interactive branch creation and switching
+- Easy worktree removal with confirmation
+- Telescope integration for fuzzy finding
+- Uses your existing `git wt` and `git wtr` aliases
+- Auto-switch to newly created worktrees
 
 ## Installation
 
@@ -17,7 +17,7 @@ A Neovim plugin for managing git worktrees with a clean `.worktrees/` directory 
 
 ```lua
 {
-  "your-username/worktree.nvim",
+  "quiet-ghost/worktree.nvim",
   dependencies = {
     "nvim-telescope/telescope.nvim", -- optional
   },
@@ -35,7 +35,7 @@ A Neovim plugin for managing git worktrees with a clean `.worktrees/` directory 
 
 ```lua
 use {
-  "your-username/worktree.nvim",
+  "quier-ghost/worktree.nvim",
   requires = {
     "nvim-telescope/telescope.nvim", -- optional
   },
@@ -51,30 +51,30 @@ This plugin requires the `git wt` and `git wtr` aliases to be configured. Run th
 
 ```bash
 # Create worktree alias
-git config --global alias.wt '!f() { 
-  if [ -z "$1" ]; then 
-    echo "Available branches:"; 
-    git branch -a | grep -v HEAD; 
-    echo ""; 
-    echo "Usage: git wt <branch-name>"; 
-    return; 
-  fi; 
-  if git show-ref --verify --quiet refs/heads/$1; then 
-    echo "Using existing branch: $1"; 
-    git worktree add ./.worktrees/$1 $1; 
-  else 
-    echo "Branch $1 does not exist."; 
-    echo "Available branches:"; 
-    git branch -a | grep -v HEAD; 
-    echo ""; 
-    read -p "Create new branch $1? (Y/n): " -n 1 -r; 
-    echo ""; 
-    if [[ $REPLY =~ ^[Nn]$ ]]; then 
-      echo "Cancelled."; 
-    else 
-      git worktree add -b $1 ./.worktrees/$1 HEAD; 
-    fi; 
-  fi; 
+git config --global alias.wt '!f() {
+  if [ -z "$1" ]; then
+    echo "Available branches:";
+    git branch -a | grep -v HEAD;
+    echo "";
+    echo "Usage: git wt <branch-name>";
+    return;
+  fi;
+  if git show-ref --verify --quiet refs/heads/$1; then
+    echo "Using existing branch: $1";
+    git worktree add ./.worktrees/$1 $1;
+  else
+    echo "Branch $1 does not exist.";
+    echo "Available branches:";
+    git branch -a | grep -v HEAD;
+    echo "";
+    read -p "Create new branch $1? (Y/n): " -n 1 -r;
+    echo "";
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+      echo "Cancelled.";
+    else
+      git worktree add -b $1 ./.worktrees/$1 HEAD;
+    fi;
+  fi;
 }; f'
 
 # Remove worktree alias
@@ -89,27 +89,27 @@ git config --global alias.wtr '!f() {
     fi;
     return;
   fi;
-  
+
   echo "Current worktrees:";
   git worktree list | grep "\.worktrees" | while read line; do
     path=$(echo "$line" | awk "{print \$1}");
     branch=$(basename "$path");
     echo "  $branch";
   done;
-  
+
   if ! git worktree list | grep -q "\.worktrees"; then
     echo "  No worktrees found.";
     return;
   fi;
-  
+
   echo "";
   read -p "Enter worktree name to remove (or press Enter to cancel): " worktree_name;
-  
+
   if [ -z "$worktree_name" ]; then
     echo "Cancelled.";
     return;
   fi;
-  
+
   if [ -d ".worktrees/$worktree_name" ]; then
     read -p "Remove worktree $worktree_name? (Y/n): " -n 1 -r;
     echo "";
@@ -160,10 +160,12 @@ require("telescope").extensions.worktrees.create_worktree()
 ### Key Mappings (Telescope)
 
 In the worktree picker:
+
 - `<CR>` - Switch to selected worktree
 - `<C-d>` - Delete selected worktree
 
 In the create worktree picker:
+
 - `<CR>` - Create worktree from selected branch
 - `<C-n>` - Create worktree with new branch name
 
