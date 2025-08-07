@@ -1,15 +1,16 @@
 # worktree.nvim
 
-A Neovim plugin for managing git worktrees with a clean `.worktrees/` directory structure.
+A Neovim plugin for managing git worktrees with Telescope integration, inspired by ThePrimeagen's git-worktree.nvim.
 
 ## Features
 
 - Create and manage git worktrees in a dedicated `.worktrees/` directory
-- Interactive branch creation and switching
+- Full Telescope integration for fuzzy finding and management
+- Fast switching between worktrees
 - Easy worktree removal with confirmation
-- Telescope integration for fuzzy finding
-- Uses your existing `git wt` and `git wtr` aliases
 - Auto-switch to newly created worktrees
+- Automatic branch detection (existing vs new)
+- Clean project structure with organized worktrees
 
 ## Installation
 
@@ -19,14 +20,20 @@ A Neovim plugin for managing git worktrees with a clean `.worktrees/` directory 
 {
   "quiet-ghost/git-worktree.nvim",
   dependencies = {
-    "nvim-telescope/telescope.nvim", -- optional
+    "nvim-telescope/telescope.nvim", -- required for telescope integration
   },
   config = function()
     require("worktree").setup({
-      worktree_dir = ".worktrees",     -- Directory name for worktrees
-      auto_switch = true,              -- Auto-switch to new worktrees
-      telescope_integration = true,    -- Enable telescope integration
+      worktree_dir = ".worktrees",              -- Directory name for worktrees
+      change_directory_command = "cd",          -- Command to change directory (cd, tcd, lcd)
+      update_on_change = true,                  -- Update after switching worktree
+      update_on_change_command = "e .",         -- Command to run after switching
+      clearjumps_on_change = true,              -- Clear jump list when switching
+      confirm_telescope_deletions = true,       -- Confirm before deleting in telescope
     })
+
+    -- Load telescope extension
+    require("telescope").load_extension("worktree")
   end,
 }
 ```
@@ -37,95 +44,18 @@ A Neovim plugin for managing git worktrees with a clean `.worktrees/` directory 
 use {
   "quiet-ghost/git-worktree.nvim",
   requires = {
-    "nvim-telescope/telescope.nvim", -- optional
+    "nvim-telescope/telescope.nvim",
   },
   config = function()
     require("worktree").setup()
+    require("telescope").load_extension("worktree")
   end,
 }
 ```
 
-## Prerequisites
+## Setup
 
-This plugin requires the `git wt` and `git wtr` aliases to be configured. Run these commands to set them up:
-
-```bash
-# Create worktree alias
-git config --global alias.wt '!f() {
-  if [ -z "$1" ]; then
-    echo "Available branches:";
-    git branch -a | grep -v HEAD;
-    echo "";
-    echo "Usage: git wt <branch-name>";
-    return;
-  fi;
-  if git show-ref --verify --quiet refs/heads/$1; then
-    echo "Using existing branch: $1";
-    git worktree add ./.worktrees/$1 $1;
-  else
-    echo "Branch $1 does not exist.";
-    echo "Available branches:";
-    git branch -a | grep -v HEAD;
-    echo "";
-    read -p "Create new branch $1? (Y/n): " -n 1 -r;
-    echo "";
-    if [[ $REPLY =~ ^[Nn]$ ]]; then
-      echo "Cancelled.";
-    else
-      git worktree add -b $1 ./.worktrees/$1 HEAD;
-    fi;
-  fi;
-}; f'
-
-# Remove worktree alias
-git config --global alias.wtr '!f() {
-  if [ -n "$1" ]; then
-    if [ -d ".worktrees/$1" ]; then
-      echo "Removing worktree: $1";
-      git worktree remove .worktrees/$1;
-      echo "Worktree $1 removed.";
-    else
-      echo "Worktree $1 not found in .worktrees/";
-    fi;
-    return;
-  fi;
-
-  echo "Current worktrees:";
-  git worktree list | grep "\.worktrees" | while read line; do
-    path=$(echo "$line" | awk "{print \$1}");
-    branch=$(basename "$path");
-    echo "  $branch";
-  done;
-
-  if ! git worktree list | grep -q "\.worktrees"; then
-    echo "  No worktrees found.";
-    return;
-  fi;
-
-  echo "";
-  read -p "Enter worktree name to remove (or press Enter to cancel): " worktree_name;
-
-  if [ -z "$worktree_name" ]; then
-    echo "Cancelled.";
-    return;
-  fi;
-
-  if [ -d ".worktrees/$worktree_name" ]; then
-    read -p "Remove worktree $worktree_name? (Y/n): " -n 1 -r;
-    echo "";
-    if [[ $REPLY =~ ^[Nn]$ ]]; then
-      echo "Cancelled.";
-    else
-      git worktree remove .worktrees/$worktree_name;
-      echo "Worktree $worktree_name removed.";
-    fi;
-  else
-    echo "Worktree $worktree_name not found.";
-  fi;
-}; f'
-```
-
-Also add `/.worktrees/` to your `.gitignore` file:
+Add `/.worktrees/` to your `.gitignore` file:
 
 ```gitignore
 # Worktree directories
@@ -134,50 +64,119 @@ Also add `/.worktrees/` to your `.gitignore` file:
 
 ## Usage
 
-### Commands
+### Primary Commands (Telescope)
 
-- `:WorktreeCreate [branch]` - Create a new worktree (prompts for branch name if not provided)
-- `:WorktreeRemove [branch]` - Remove a worktree (interactive selection if not provided)
-- `:WorktreeList` - List all worktrees
-- `:WorktreeSwitch` - Switch to a worktree (interactive selection)
-
-### Telescope Integration
-
-If you have Telescope installed, you can use:
+The main interface is through Telescope:
 
 ```vim
-:Telescope worktrees
-:Telescope create_worktree
+:Worktrees              " List and manage existing worktrees
+:WorktreeCreate         " Create new worktree from branch
 ```
 
-Or in Lua:
+### Telescope Key Mappings
+
+**In `:Worktrees` picker:**
+
+- `<Enter>` - Switch to selected worktree
+- `<C-d>` - Delete selected worktree (insert mode)
+- `dd` - Delete selected worktree (normal mode)
+
+**In `:WorktreeCreate` picker:**
+
+- `<Enter>` - Create worktree from selected existing branch
+- `<C-n>` - Create worktree with new branch name
+
+### Lua API
 
 ```lua
-require("telescope").extensions.worktrees.worktrees()
-require("telescope").extensions.worktrees.create_worktree()
+-- Telescope pickers
+require("telescope").extensions.worktree.worktrees()
+require("telescope").extensions.worktree.create_worktree()
+
+-- Direct API
+local worktree = require("worktree")
+worktree.create_worktree("feature-branch")  -- Creates .worktrees/feature-branch
+worktree.switch_worktree("/path/to/worktree")
+worktree.delete_worktree("/path/to/worktree")
+worktree.get_worktrees()  -- Returns list of managed worktrees
 ```
 
-### Key Mappings (Telescope)
+### Legacy Commands
 
-In the worktree picker:
+For backward compatibility:
 
-- `<CR>` - Switch to selected worktree
-- `<C-d>` - Delete selected worktree
+- `:WorktreeCreate [branch]` - Create a new worktree
+- `:WorktreeRemove [branch]` - Remove a worktree
+- `:WorktreeList` - List all worktrees
+- `:WorktreeSwitch` - Switch to a worktree
 
-In the create worktree picker:
+### Recommended Keymaps
 
-- `<CR>` - Create worktree from selected branch
-- `<C-n>` - Create worktree with new branch name
+Add these to your Neovim config:
+
+```lua
+-- Using commands
+vim.keymap.set("n", "<leader>gw", "<cmd>Worktrees<cr>", { desc = "Git worktrees" })
+vim.keymap.set("n", "<leader>gW", "<cmd>WorktreeCreate<cr>", { desc = "Create worktree" })
+
+-- Or using Lua functions directly
+vim.keymap.set("n", "<leader>gw", function()
+  require("telescope").extensions.worktree.worktrees()
+end, { desc = "Git worktrees" })
+
+vim.keymap.set("n", "<leader>gW", function()
+  require("telescope").extensions.worktree.create_worktree()
+end, { desc = "Create worktree" })
+```
+
+### Common Keymap Issues
+
+If your keymaps aren't working, make sure you:
+
+1. **Load the telescope extension** in your config:
+
+   ```lua
+   require("telescope").load_extension("worktree")
+   ```
+
+2. **Set keymaps after plugin setup**:
+   ```lua
+   -- In your lazy.nvim config
+   {
+     "your-username/worktree.nvim",
+     dependencies = { "nvim-telescope/telescope.nvim" },
+     config = function()
+       require("worktree").setup()
+       require("telescope").load_extension("worktree")
+
+       -- Set keymaps here
+       vim.keymap.set("n", "<leader>gw", "<cmd>Worktrees<cr>")
+       vim.keymap.set("n", "<leader>gW", "<cmd>WorktreeCreate<cr>")
+     end,
+   }
+   ```
 
 ## Configuration
 
 ```lua
 require("worktree").setup({
-  worktree_dir = ".worktrees",     -- Directory name for worktrees
-  auto_switch = true,              -- Auto-switch to new worktrees
-  telescope_integration = true,    -- Enable telescope integration
+  worktree_dir = ".worktrees",              -- Directory name for worktrees (relative to git root)
+  change_directory_command = "cd",          -- Command to change directory (cd, tcd, lcd)
+  update_on_change = true,                  -- Update after switching worktree
+  update_on_change_command = "e .",         -- Command to run after switching
+  clearjumps_on_change = true,              -- Clear jump list when switching
+  confirm_telescope_deletions = true,       -- Confirm before deleting in telescope
 })
 ```
+
+### Configuration Options
+
+- **`worktree_dir`**: Directory name for worktrees (default: `.worktrees`)
+- **`change_directory_command`**: Command used to change directory (`cd`, `tcd`, `lcd`)
+- **`update_on_change`**: Whether to run update command after switching (default: `true`)
+- **`update_on_change_command`**: Command to run after switching (default: `e .`)
+- **`clearjumps_on_change`**: Clear jump list when switching worktrees (default: `true`)
+- **`confirm_telescope_deletions`**: Show confirmation before deleting in telescope (default: `true`)
 
 ## Project Structure
 
