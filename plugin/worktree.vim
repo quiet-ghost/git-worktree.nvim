@@ -12,10 +12,10 @@ command! -nargs=? WorktreeRemove lua require('worktree').remove(<f-args>)
 command! WorktreeList lua require('worktree').list()
 command! WorktreeSwitch lua require('worktree').switch()
 
-" Telescope integration commands (primary interface)
+" Primary telescope interface (unified)
 command! Worktrees lua require('telescope').extensions.worktree.worktrees()
-command! WorktreeCreate lua require('telescope').extensions.worktree.create_worktree()
 
-" Legacy telescope commands for backward compatibility  
+" Legacy commands (all redirect to unified interface)
+command! WorktreeCreate lua require('telescope').extensions.worktree.worktrees()
 command! WorktreeTelescope lua require('telescope').extensions.worktree.worktrees()
-command! WorktreeTelescopeCreate lua require('telescope').extensions.worktree.create_worktree()
+command! WorktreeTelescopeCreate lua require('telescope').extensions.worktree.worktrees()

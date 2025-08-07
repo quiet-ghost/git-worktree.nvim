@@ -14,60 +14,120 @@ local worktree = require("worktree")
 
 local M = {}
 
--- Telescope picker for worktrees (switch/delete)
+-- Unified telescope picker for all worktree operations
 function M.worktrees(opts)
   opts = opts or {}
   
   local worktrees = worktree.get_worktrees()
+  local all_branches = worktree.get_all_branches()
   
-  if #worktrees == 0 then
-    vim.notify("No worktrees found in .worktrees directory", vim.log.levels.WARN)
-    return
+  -- Combine existing worktrees with available branches for creation
+  local results = {}
+  
+  -- Add existing worktrees first
+  for _, wt in ipairs(worktrees) do
+    table.insert(results, {
+      type = "worktree",
+      branch = wt.branch,
+      path = wt.path,
+      is_current = wt.is_current,
+      is_main = wt.is_main,
+      locked = wt.locked,
+      bare = wt.bare,
+    })
+  end
+  
+  -- Add available branches that don't have worktrees yet
+  for _, branch in ipairs(all_branches) do
+    table.insert(results, {
+      type = "branch",
+      branch = branch,
+      path = nil,
+      is_current = false,
+      is_main = false,
+      locked = false,
+      bare = false,
+    })
   end
 
   pickers.new(opts, {
-    prompt_title = "Git Worktrees",
+    prompt_title = "Git Worktrees (Enter: switch/create, C-d/dd: delete)",
     finder = finders.new_table({
-      results = worktrees,
+      results = results,
       entry_maker = function(entry)
         local display_text = entry.branch
-        local path_display = utils.transform_path(opts, entry.path)
+        local path_display = ""
         
-        -- Add status indicators
-        if entry.is_current then
-          display_text = display_text .. " (current)"
-        end
-        if entry.is_main then
-          display_text = display_text .. " (main)"
-        end
-        if entry.locked then
-          display_text = display_text .. " [LOCKED]"
-        end
-        if entry.bare then
-          display_text = display_text .. " [BARE]"
+        if entry.type == "worktree" then
+          path_display = utils.transform_path(opts, entry.path)
+          
+          -- Add status indicators for existing worktrees
+          if entry.is_current then
+            display_text = display_text .. " (current)"
+          end
+          if entry.is_main then
+            display_text = display_text .. " (main)"
+          end
+          if entry.locked then
+            display_text = display_text .. " [LOCKED]"
+          end
+          if entry.bare then
+            display_text = display_text .. " [BARE]"
+          end
+        else
+          -- Available branch for creation
+          display_text = display_text .. " (create)"
+          path_display = "→ will create in .worktrees/"
         end
         
         return {
           value = entry,
-          display = string.format("%-25s %s", display_text, path_display),
-          ordinal = entry.branch .. " " .. entry.path,
+          display = string.format("%-30s %s", display_text, path_display),
+          ordinal = entry.branch,
         }
       end,
     }),
     sorter = conf.generic_sorter(opts),
     attach_mappings = function(prompt_bufnr, map)
-      actions.select_default:replace(function()
-        actions.close(prompt_bufnr)
+      -- Handle dynamic creation when typing
+      local function handle_selection()
+        local picker = action_state.get_current_picker(prompt_bufnr)
         local selection = action_state.get_selected_entry()
-        if selection and not selection.value.is_current then
-          worktree.switch_worktree(selection.value.path)
+        
+        if selection then
+          if selection.value.type == "worktree" then
+            -- Switch to existing worktree
+            if not selection.value.is_current then
+              actions.close(prompt_bufnr)
+              worktree.switch_worktree(selection.value.path)
+            end
+          else
+            -- Create new worktree from branch
+            actions.close(prompt_bufnr)
+            local path = worktree.create_worktree(selection.value.branch)
+            if path then
+              worktree.switch_worktree(path)
+            end
+          end
+        else
+          -- No selection - check if user typed a new branch name
+          local current_line = action_state.get_current_line()
+          if current_line and current_line ~= "" then
+            actions.close(prompt_bufnr)
+            local path = worktree.create_worktree(current_line)
+            if path then
+              worktree.switch_worktree(path)
+            end
+          end
         end
-      end)
+      end
+      
+      actions.select_default:replace(handle_selection)
 
-      -- Delete worktree with <C-d>
+      -- Delete worktree with <C-d> (insert mode)
       map("i", "<C-d>", function()
         local selection = action_state.get_selected_entry()
-        if selection then
+        if selection and selection.value.type == "worktree" then
           local wt = selection.value
           if wt.is_current then
             vim.notify("Cannot delete current worktree", vim.log.levels.WARN)
@@ -97,12 +157,15 @@ function M.worktrees(opts)
               end)
             end
           end
+        else
+          vim.notify("Cannot delete branch that hasn't been created as worktree", vim.log.levels.WARN)
         end
       end)
 
+      -- Delete worktree with dd (normal mode)
       map("n", "dd", function()
         local selection = action_state.get_selected_entry()
-        if selection then
+        if selection and selection.value.type == "worktree" then
           local wt = selection.value
           if wt.is_current then
             vim.notify("Cannot delete current worktree", vim.log.levels.WARN)
@@ -132,6 +195,8 @@ function M.worktrees(opts)
               end)
             end
           end
+        else
+          vim.notify("Cannot delete branch that hasn't been created as worktree", vim.log.levels.WARN)
         end
       end)
 
@@ -140,60 +205,9 @@ function M.worktrees(opts)
   }):find()
 end
 
--- Telescope picker for creating worktrees
+-- Keep create_worktree for backward compatibility, but redirect to main interface
 function M.create_worktree(opts)
-  opts = opts or {}
-  
-  local branches = worktree.get_all_branches()
-  
-  if #branches == 0 then
-    vim.notify("No branches found", vim.log.levels.WARN)
-    return
-  end
-
-  pickers.new(opts, {
-    prompt_title = "Create Worktree from Branch",
-    finder = finders.new_table({
-      results = branches,
-      entry_maker = function(entry)
-        return {
-          value = entry,
-          display = entry,
-          ordinal = entry,
-        }
-      end,
-    }),
-    sorter = conf.generic_sorter(opts),
-    attach_mappings = function(prompt_bufnr, map)
-      actions.select_default:replace(function()
-        actions.close(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
-        if selection then
-          local branch = selection.value
-          local path = worktree.create_worktree(branch)
-          if path then
-            -- Switch to the new worktree
-            worktree.switch_worktree(path)
-          end
-        end
-      end)
-
-      -- Create new branch with <C-n>
-      map("i", "<C-n>", function()
-        actions.close(prompt_bufnr)
-        local branch_name = vim.fn.input("New branch name: ")
-        if branch_name ~= "" then
-          local path = worktree.create_worktree(branch_name)
-          if path then
-            -- Switch to the new worktree
-            worktree.switch_worktree(path)
-          end
-        end
-      end)
-
-      return true
-    end,
-  }):find()
+  M.worktrees(opts)
 end
 
 -- Register telescope extension

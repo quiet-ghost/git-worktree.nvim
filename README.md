@@ -64,27 +64,33 @@ Add `/.worktrees/` to your `.gitignore` file:
 
 ## Usage
 
-### Primary Commands (Telescope)
+### Unified Interface
 
-The main interface is through Telescope:
+Everything is done through one command:
 
 ```vim
-:Worktrees              " List and manage existing worktrees
-:WorktreeCreate         " Create new worktree from branch
+:Worktrees              " View, create, switch, and delete worktrees
 ```
 
-### Telescope Key Mappings
+### How It Works
 
-**In `:Worktrees` picker:**
+The `:Worktrees` command shows:
+- **Existing worktrees** - switch to them with `<Enter>`
+- **Available branches** - create worktree with `<Enter>`
+- **Type new branch name** - creates new worktree if no match found
 
-- `<Enter>` - Switch to selected worktree
+### Key Mappings
+
+- `<Enter>` - Switch to worktree OR create worktree from branch OR create new branch
 - `<C-d>` - Delete selected worktree (insert mode)
 - `dd` - Delete selected worktree (normal mode)
 
-**In `:WorktreeCreate` picker:**
+### Workflow Examples
 
-- `<Enter>` - Create worktree from selected existing branch
-- `<C-n>` - Create worktree with new branch name
+1. **Switch to existing worktree**: `:Worktrees` → select worktree → `<Enter>`
+2. **Create from existing branch**: `:Worktrees` → select branch (create) → `<Enter>`
+3. **Create new branch**: `:Worktrees` → type "new-feature" → `<Enter>`
+4. **Delete worktree**: `:Worktrees` → select worktree → `<C-d>` or `dd`
 
 ### Lua API
 
@@ -104,30 +110,24 @@ worktree.get_worktrees()  -- Returns list of managed worktrees
 
 ### Legacy Commands
 
-For backward compatibility:
+For backward compatibility (all redirect to unified interface):
 
-- `:WorktreeCreate [branch]` - Create a new worktree
-- `:WorktreeRemove [branch]` - Remove a worktree
+- `:WorktreeCreate` - Opens unified worktree interface
+- `:WorktreeRemove [branch]` - Remove a worktree  
 - `:WorktreeList` - List all worktrees
 - `:WorktreeSwitch` - Switch to a worktree
-
 ### Recommended Keymaps
 
-Add these to your Neovim config:
+Add this to your Neovim config:
 
 ```lua
--- Using commands
+-- Single keymap for everything
 vim.keymap.set("n", "<leader>gw", "<cmd>Worktrees<cr>", { desc = "Git worktrees" })
-vim.keymap.set("n", "<leader>gW", "<cmd>WorktreeCreate<cr>", { desc = "Create worktree" })
 
--- Or using Lua functions directly
+-- Or using Lua function directly
 vim.keymap.set("n", "<leader>gw", function()
   require("telescope").extensions.worktree.worktrees()
 end, { desc = "Git worktrees" })
-
-vim.keymap.set("n", "<leader>gW", function()
-  require("telescope").extensions.worktree.create_worktree()
-end, { desc = "Create worktree" })
 ```
 
 ### Common Keymap Issues
