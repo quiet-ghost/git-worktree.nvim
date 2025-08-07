@@ -13,9 +13,9 @@ command! WorktreeList lua require('worktree').list()
 command! WorktreeSwitch lua require('worktree').switch()
 
 " Telescope integration commands (primary interface)
-command! Worktrees Telescope worktree worktrees
-command! WorktreeCreate Telescope worktree create_worktree
+command! Worktrees lua require('telescope').extensions.worktree.worktrees()
+command! WorktreeCreate lua require('telescope').extensions.worktree.create_worktree()
 
 " Legacy telescope commands for backward compatibility  
-command! WorktreeTelescope Telescope worktree worktrees
-command! WorktreeTelescopeCreate Telescope worktree create_worktree
+command! WorktreeTelescope lua require('telescope').extensions.worktree.worktrees()
+command! WorktreeTelescopeCreate lua require('telescope').extensions.worktree.create_worktree()

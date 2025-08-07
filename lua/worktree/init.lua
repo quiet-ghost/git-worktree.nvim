@@ -56,16 +56,30 @@ function M.create_worktree(branch)
   -- Always create in .worktrees directory
   local worktree_path = git_root .. "/" .. M.config.worktree_dir .. "/" .. branch
 
-  -- Check if branch exists
+  -- Check if branch exists locally
   local branch_exists_cmd = string.format("git show-ref --verify --quiet refs/heads/%s", vim.fn.shellescape(branch))
   local _, branch_exists = execute_command(branch_exists_cmd)
 
+  -- Check if branch exists remotely
+  local remote_branch_cmd = string.format("git show-ref --verify --quiet refs/remotes/origin/%s", vim.fn.shellescape(branch))
+  local _, remote_exists = execute_command(remote_branch_cmd)
+  
+  -- Also check upstream
+  local upstream_branch_cmd = string.format("git show-ref --verify --quiet refs/remotes/upstream/%s", vim.fn.shellescape(branch))
+  local _, upstream_exists = execute_command(upstream_branch_cmd)
+
   local cmd
   if branch_exists then
-    -- Use existing branch
+    -- Use existing local branch
     cmd = string.format("git worktree add %s %s", vim.fn.shellescape(worktree_path), vim.fn.shellescape(branch))
+  elseif remote_exists then
+    -- Create from remote origin branch
+    cmd = string.format("git worktree add -b %s %s origin/%s", vim.fn.shellescape(branch), vim.fn.shellescape(worktree_path), vim.fn.shellescape(branch))
+  elseif upstream_exists then
+    -- Create from remote upstream branch
+    cmd = string.format("git worktree add -b %s %s upstream/%s", vim.fn.shellescape(branch), vim.fn.shellescape(worktree_path), vim.fn.shellescape(branch))
   else
-    -- Create new branch
+    -- Create new branch from HEAD
     cmd = string.format("git worktree add -b %s %s HEAD", vim.fn.shellescape(branch), vim.fn.shellescape(worktree_path))
   end
 
@@ -308,6 +322,37 @@ function M.switch_to(branch_name)
   return false
 end
 
+-- Get current branch
+local function get_current_branch()
+  local cmd = "git branch --show-current"
+  local result, success = execute_command(cmd)
+  if success and result ~= "" then
+    return vim.trim(result)
+  end
+  return nil
+end
+
+-- Get branches that are already used by worktrees
+local function get_used_branches()
+  local worktrees = M.get_worktrees()
+  local used = {}
+  
+  -- Add current branch
+  local current = get_current_branch()
+  if current then
+    used[current] = true
+  end
+  
+  -- Add worktree branches
+  for _, wt in ipairs(worktrees) do
+    if wt.branch and wt.branch ~= "(bare)" and wt.branch ~= "(detached)" then
+      used[wt.branch] = true
+    end
+  end
+  
+  return used
+end
+
 -- Get available branches for creating worktrees
 function M.get_all_branches()
   local cmd = "git branch -a --format='%(refname:short)'"
@@ -319,13 +364,16 @@ function M.get_all_branches()
   
   local branches = {}
   local seen = {}
+  local used_branches = get_used_branches()
   
   for branch in result:gmatch("[^\r\n]+") do
     branch = vim.trim(branch)
     if branch ~= "" and not branch:match("HEAD") then
       -- Clean up remote branch names
-      local clean_branch = branch:gsub("^origin/", "")
-      if not seen[clean_branch] then
+      local clean_branch = branch:gsub("^origin/", ""):gsub("^upstream/", "")
+      
+      -- Only add if not already seen and not already used by a worktree
+      if not seen[clean_branch] and not used_branches[clean_branch] then
         seen[clean_branch] = true
         table.insert(branches, clean_branch)
       end

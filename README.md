@@ -194,6 +194,54 @@ my-project/
     └── dev/               # Worktree for dev
 ```
 
+## Troubleshooting
+
+### "No worktrees found in .worktrees directory"
+
+This means you haven't created any worktrees yet, or they're not in the `.worktrees` directory. The plugin only shows worktrees that are managed in the `.worktrees` folder.
+
+### "Branch 'master' is already used by worktree"
+
+This happens when you try to create a worktree using a branch that's already checked out. The plugin now filters out branches that are already in use. If you see this error:
+
+1. The branch filtering should prevent this, but if it still happens:
+2. Create a new branch name instead
+3. Or use `:WorktreeCreate` and press `<C-n>` to create a new branch
+
+### "Extension doesn't exist or isn't installed"
+
+Make sure you:
+
+1. **Load the extension** in your config:
+   ```lua
+   require("telescope").load_extension("worktree")
+   ```
+
+2. **Have telescope installed** as a dependency
+
+3. **Plugin is properly installed** in your plugin manager
+
+### Keymaps not working
+
+1. **Check if commands work first**:
+   ```vim
+   :Worktrees
+   :WorktreeCreate
+   ```
+
+2. **Make sure extension is loaded** before setting keymaps:
+   ```lua
+   require("telescope").load_extension("worktree")
+   vim.keymap.set("n", "<leader>gw", "<cmd>Worktrees<cr>")
+   ```
+
+3. **Try Lua functions directly**:
+   ```lua
+   vim.keymap.set("n", "<leader>gw", function()
+     require("telescope").extensions.worktree.worktrees()
+   end)
+   ```
+
 ## License
 
 MIT
