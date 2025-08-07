@@ -191,22 +191,18 @@ function M.get_worktrees()
     table.insert(worktrees, current_wt)
   end
 
-  -- Filter for .worktrees directory - fix the pattern matching
-  local filtered = {}
-  local worktree_pattern = "/" .. M.config.worktree_dir .. "/"
-  
+  -- Return all worktrees, but mark which ones are in our managed directory
   for _, wt in ipairs(worktrees) do
-    -- Check if path contains the worktree directory
-    if wt.path and (wt.path:find(worktree_pattern, 1, true) or wt.path:find(M.config.worktree_dir .. "/", 1, true)) then
-      -- Extract branch name from path if not available
-      if not wt.branch then
-        wt.branch = vim.fn.fnamemodify(wt.path, ":t")
-      end
-      table.insert(filtered, wt)
+    -- Extract branch name from path if not available
+    if not wt.branch then
+      wt.branch = vim.fn.fnamemodify(wt.path, ":t")
     end
+    -- Mark if this is in our managed worktree directory
+    local worktree_pattern = "/" .. M.config.worktree_dir .. "/"
+    wt.is_managed = wt.path and (wt.path:find(worktree_pattern, 1, true) or wt.path:find(M.config.worktree_dir .. "/", 1, true)) ~= nil
   end
 
-  return filtered
+  return worktrees
 end
 
 -- List all worktrees

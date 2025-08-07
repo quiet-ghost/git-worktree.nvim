@@ -29,10 +29,14 @@ function M.worktrees(opts)
     finder = finders.new_table({
       results = worktrees,
       entry_maker = function(entry)
+        local display_text = string.format("%s (%s)", entry.branch or "main", entry.path)
+        if entry.is_managed then
+          display_text = "📁 " .. display_text
+        end
         return {
           value = entry,
-          display = string.format("%s (%s)", entry.branch, entry.path),
-          ordinal = entry.branch,
+          display = display_text,
+          ordinal = entry.branch or "main",
         }
       end,
     }),
