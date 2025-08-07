@@ -235,7 +235,10 @@ function M.get_worktrees()
     
     -- Determine if this is the current worktree
     local current_dir = vim.fn.getcwd()
-    wt.is_current = vim.startswith(current_dir, wt.path)
+    -- Normalize paths for comparison
+    local normalized_current = vim.fn.resolve(current_dir)
+    local normalized_wt_path = vim.fn.resolve(wt.path)
+    wt.is_current = normalized_current == normalized_wt_path
     
     -- Check if this worktree is in our managed .worktrees directory or is the main repo
     if git_root then
