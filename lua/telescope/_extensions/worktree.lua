@@ -37,6 +37,9 @@ function M.worktrees(opts)
         if entry.is_current then
           display_text = display_text .. " (current)"
         end
+        if entry.is_main then
+          display_text = display_text .. " (main)"
+        end
         if entry.locked then
           display_text = display_text .. " [LOCKED]"
         end
@@ -46,7 +49,7 @@ function M.worktrees(opts)
         
         return {
           value = entry,
-          display = string.format("%-20s %s", display_text, path_display),
+          display = string.format("%-25s %s", display_text, path_display),
           ordinal = entry.branch .. " " .. entry.path,
         }
       end,
@@ -68,6 +71,10 @@ function M.worktrees(opts)
           local wt = selection.value
           if wt.is_current then
             vim.notify("Cannot delete current worktree", vim.log.levels.WARN)
+            return
+          end
+          if wt.is_main then
+            vim.notify("Cannot delete main repository", vim.log.levels.WARN)
             return
           end
           
@@ -99,6 +106,10 @@ function M.worktrees(opts)
           local wt = selection.value
           if wt.is_current then
             vim.notify("Cannot delete current worktree", vim.log.levels.WARN)
+            return
+          end
+          if wt.is_main then
+            vim.notify("Cannot delete main repository", vim.log.levels.WARN)
             return
           end
           

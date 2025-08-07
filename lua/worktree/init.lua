@@ -21,11 +21,29 @@ local function is_git_repo()
   return vim.v.shell_error == 0
 end
 
--- Get git root directory
+-- Get git root directory (the main repository, not worktree)
 local function get_git_root()
   if not is_git_repo() then
     return nil
   end
+  
+  -- Get the git common directory (points to main repo .git)
+  local git_common_dir = vim.fn.system("git rev-parse --git-common-dir")
+  git_common_dir = vim.trim(git_common_dir)
+  
+  if git_common_dir and git_common_dir ~= "" then
+    -- If it's a relative path, make it absolute
+    if not vim.startswith(git_common_dir, "/") then
+      local cwd = vim.fn.getcwd()
+      git_common_dir = cwd .. "/" .. git_common_dir
+    end
+    
+    -- The git root is the parent of the .git directory
+    local git_root = vim.fn.fnamemodify(git_common_dir, ":h")
+    return git_root
+  end
+  
+  -- Fallback to show-toplevel
   local result = vim.fn.system("git rev-parse --show-toplevel")
   return vim.trim(result)
 end
@@ -166,13 +184,7 @@ function M.get_worktrees()
   
   for line in result:gmatch("[^\r\n]+") do
     line = vim.trim(line)
-    if line == "" then
-      -- Empty line indicates end of worktree entry
-      if current_wt.path then
-        table.insert(worktrees, current_wt)
-        current_wt = {}
-      end
-    elseif line:match("^worktree ") then
+    if line:match("^worktree ") then
       -- Start of new worktree entry
       if current_wt.path then
         table.insert(worktrees, current_wt)
@@ -207,7 +219,7 @@ function M.get_worktrees()
 
   -- Post-process worktrees
   local git_root = get_git_root()
-  local managed_worktrees = {}
+  local all_worktrees = {}
   
   for _, wt in ipairs(worktrees) do
     -- Set branch name for bare/detached worktrees
@@ -225,19 +237,20 @@ function M.get_worktrees()
     local current_dir = vim.fn.getcwd()
     wt.is_current = vim.startswith(current_dir, wt.path)
     
-    -- Check if this worktree is in our managed .worktrees directory
+    -- Check if this worktree is in our managed .worktrees directory or is the main repo
     if git_root then
       local worktree_pattern = git_root .. "/" .. M.config.worktree_dir .. "/"
       wt.is_managed = vim.startswith(wt.path, worktree_pattern)
+      wt.is_main = wt.path == git_root
       
-      -- Only include managed worktrees (in .worktrees directory)
-      if wt.is_managed then
-        table.insert(managed_worktrees, wt)
+      -- Include managed worktrees AND the main repository
+      if wt.is_managed or wt.is_main then
+        table.insert(all_worktrees, wt)
       end
     end
   end
 
-  return managed_worktrees
+  return all_worktrees
 end
 
 -- Switch to a worktree by path
