@@ -17,7 +17,7 @@ A Neovim plugin for managing git worktrees with a clean `.worktrees/` directory 
 
 ```lua
 {
-  "quiet-ghost/worktree.nvim",
+  "quiet-ghost/git-worktree.nvim",
   dependencies = {
     "nvim-telescope/telescope.nvim", -- optional
   },
@@ -35,7 +35,7 @@ A Neovim plugin for managing git worktrees with a clean `.worktrees/` directory 
 
 ```lua
 use {
-  "quier-ghost/worktree.nvim",
+  "quiet-ghost/git-worktree.nvim",
   requires = {
     "nvim-telescope/telescope.nvim", -- optional
   },
